@@ -65,12 +65,12 @@ impl Lox {
                 Ok(0) => break, // EOF (Ctrl+D on Unix, Ctrl+Z on Windows)
                 Ok(_) => {
                     let trimmed_line = line.trim().to_string(); // Trim whitespace
+                    
                     if trimmed_line.is_empty() {
-                        // If line is empty after trimming, continue to next prompt
-                        // This handles just pressing Enter without input
-                        self.had_error_ = false; // Reset error flag for the next prompt iteration
+                        self.had_error_ = false;
                         continue;
                     }
+                    
                     self.run(trimmed_line);
                     self.had_error_ = false; // Reset error for the next line in the prompt
                 },
@@ -94,13 +94,21 @@ impl Lox {
         eprintln!("[line {}] Error {}: {}", line, loc, msg);
     }
 
-    fn run(&mut self, source_code: String) { // Renamed `file_path` to `source_code` for clarity
-        let mut scanner = Scanner::new(source_code);
-        let tokens = scanner.scan_tokens(); // Renamed scanTokens to scan_tokens (Rust convention)
+    // ////////////////////////////////////////////////////////////////
+    // Calling scanner
 
+    fn run(&mut self, source_code: String) {
+        println!("src code: {}", source_code.clone()); // debugging - delete when done.
+        let mut scanner = Scanner::new(source_code);
+
+        let tokens = scanner.scan_tokens();
+        
+        print!("tokens collected: ");
         for t in tokens {
-            println!("{}", t);
+            print!("{}", t);
+            print!(" -> ");
         }
+        print!("\n");
     }
 }
 

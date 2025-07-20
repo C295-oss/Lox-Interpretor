@@ -14,6 +14,8 @@ pub enum TokenType {
     RightParen,
     LeftBrace,
     RightBrace,
+    LeftSqrBrace,
+    RightSqrBrace,
     COMMA,
     DOT,
     MINUS,
@@ -58,10 +60,57 @@ pub enum TokenType {
     EOF
 }
 
+
 impl fmt::Display for TokenType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Pass 'self' to the formatter to display the TokenType variant
-        write!(f, "{:?}", self)
+        match self {
+            Self::LeftParen => write!(f, "LeftParen"),
+            Self::RightParen => write!(f, "RightParen"),
+            Self::LeftSqrBrace => write!(f, "LeftSqrBrace"),
+            Self::RightSqrBrace => write!(f, "RightSqrBrace"),
+            Self::LeftBrace => write!(f, "LeftBrace"),
+            Self::RightBrace => write!(f, "RightBrace"),
+            Self::COMMA => write!(f, "COMMA"),
+            Self::DOT => write!(f, "DOT"),
+            Self::MINUS => write!(f, "MINUS"),
+            Self::PLUS => write!(f, "PLUS"),
+            Self::SEMICOLON => write!(f, "SEMICOLON"),
+            Self::SLASH => write!(f, "SLASH"),
+            Self::STAR => write!(f, "STAR"),
+
+            Self::BANG => write!(f, "BANG"),
+            Self::BangEqual => write!(f, "BangEqual"),
+            Self::EQUAL => write!(f, "EQUAL"),
+            Self::EqualEqual => write!(f, "EqualEqual"),
+            Self::GREATER => write!(f, "GREATER"),
+            Self::GreaterEqual => write!(f, "GreaterEqual"),
+            Self::LESS => write!(f, "LESS"),
+            Self::LessEqual => write!(f, "LessEqual"),
+
+            Self::IDENTIFIER => write!(f, "IDENTIFIER"),
+            Self::STRING => write!(f, "STRING"),
+            Self::NUMBER => write!(f, "NUMBER"),
+
+            Self::AND => write!(f, "AND"),
+            Self::CLASS => write!(f, "CLASS"),
+            Self::ELSE => write!(f, "ELSE"),
+            Self::FALSE => write!(f, "FALSE"),
+            Self::FUN => write!(f, "FUN"),
+            Self::FOR => write!(f, "FOR"),
+            Self::IF => write!(f, "IF"),
+            Self::NIL => write!(f, "NIL"),
+            Self::OR => write!(f, "OR"),
+            Self::PRINT => write!(f, "PRINT"),
+            Self::RETURN => write!(f, "RETURN"),
+            Self::SUPER => write!(f, "SUPER"),
+            Self::THIS => write!(f, "THIS"),
+            Self::TRUE => write!(f, "TRUE"),
+            Self::VAR => write!(f, "VAR"),
+            Self::WHILE => write!(f, "WHILE"),
+
+            Self::EOF => write!(f, "EOF"),
+        }
     }
 }
 
@@ -86,7 +135,16 @@ impl Token {
 impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // Define how to format the Token
-        write!(f, "TOKEN: {:?} - {}", self.token_type, self.line)
+        write!(f, "TOKEN: {:?} - Line {}", self.token_type, self.line)?; // Added Line for clarity and ? for error handling
+
+        // You might want to also include the literal if it exists
+        if let Some(ref lit) = self.literal {
+            match lit {
+                Literal::String(s) => write!(f, " - Literal: \"{}\"", s)?,
+                Literal::Number(i) => write!(f, " - Literal: {}", i)?,
+            }
+        }
+        Ok(())
     }
 }
 
@@ -95,8 +153,8 @@ impl fmt::Display for Token {
 pub struct Scanner {
     source: Vec<char>,
     tokens: Vec<Token>,
-    start: usize,
     current: usize,
+    start: usize,
     line: usize,
  }
 
@@ -106,8 +164,8 @@ pub struct Scanner {
         Scanner {
             source: src.chars().collect(),
             tokens: Vec::new(),
-            start: 0,
             current: 0,
+            start: 0,
             line: 1,
         }
     }
@@ -115,11 +173,12 @@ pub struct Scanner {
 
     pub fn scan_tokens(&mut self) -> &Vec<Token> {
 
-        while self.at_end() == false {
+        while !self.at_end() {
             self.start = self.current;
             self.scan_token();
         }
 
+        self.add_token(TokenType::EOF);
         &self.tokens
     }
 
@@ -130,21 +189,37 @@ pub struct Scanner {
 
 
     fn get_next_char(&mut self) -> char {
+        
         if self.at_end() {
-            '\0';
+            return '\0';
         }
         
         self.current += 1;
+        let c = self.peek();
+        c
+    }
+
+
+    fn advance(&mut self) -> char {
         let c = self.source[self.current];
+        self.current += 1;
         c
     }
 
 
     fn peek(&self) -> char {
         if self.at_end() {
-            return '\0'; // Return a null character or similar sentinel for EOF
+            return '\0';
         }
         self.source[self.current]
+    }
+
+
+    fn peek_next(&self) -> char {
+        if self.current + 1 >= self.source.len() {
+            return '\0';
+        }
+        self.source[self.current + 1]
     }
 
 
@@ -154,23 +229,25 @@ pub struct Scanner {
 
 
     fn add_token_literal(&mut self, token_type: TokenType, literal: Option<Literal>) {
-        self.tokens.push(Token::new(token_type, literal, self.line));   
+        println!("Token Added: {}", token_type); 
+        self.tokens.push(Token::new(token_type, literal, self.line));  
     }
 
 
     fn get_token_number(&mut self) {
-        let start_val = self.current;
-
-        while self.source[self.current].is_ascii_digit() 
-            && !self.at_end()
-        {
-            self.current += 1; 
+        if self.peek() == '.' && self.peek_next().is_ascii_digit() {
+            self.advance();
+            while self.peek().is_ascii_digit() {
+                self.advance();
+            }
         }
 
-        let num_str: String = self.source[start_val..self.current].iter().collect();
+        let num_str: String = self.source[self.start..self.current].iter().collect();
+        // println!("\tget_token_number: {}", num_str);
+        
         match num_str.parse::<f64>() {
             Ok(num_value) => {
-                let processed_num = num_value + 1.5;
+                let processed_num = num_value;
                 self.add_token_literal(TokenType::NUMBER, Some(Literal::Number(processed_num)));
             }
             Err(e) => {
@@ -181,29 +258,22 @@ pub struct Scanner {
 
 
     fn get_token_string(&mut self) {
-        let start_val = self.current;
-
-        while self.source[self.current] != '"' 
-            && !self.at_end()
+        while self.peek() != '"' && !self.at_end()
         {
             if self.peek() == '\n' {
                 self.line += 1;
             }
-            self.current += 1;
+            self.advance();
         }
+
 
         if self.at_end() {
-            eprintln!("Lexical Error on line {}: Unterminated string.", self.line);
+            eprintln!("Lexical Error: Unterminated string on line {}.", self.line);
             return;
         }
+        self.advance(); // Consume closing '"'
 
-        if self.peek() == '\0' {
-            eprintln!("PEEK - Lexical Error on line {}: Unterminated string.", self.line);
-            return;
-        }
-
-        self.current += 1;
-        let curr_string: String = self.source[start_val..self.current]
+        let curr_string: String = self.source[self.start..self.current]
             .iter()
             .collect();
         
@@ -212,16 +282,17 @@ pub struct Scanner {
 
 
     fn scan_token_literal_and_keywords(&mut self) {
-        let start_val = self.current;
-
-        while self.source[self.current].is_alphabetic() 
-            && !self.at_end()
-        {
-            self.current += 1;
+        while self.peek().is_alphanumeric() || self.peek() == '_' {
+            self.advance();
         }
-        let lt: String = self.source[start_val..self.current]
+
+
+        let lt: String = self.source[self.start..self.current]
             .iter()
             .collect();
+
+        println!("scan_token_literal_and_keywords - {}", lt);
+
         
         match lt.as_str() {
             "and" => {
@@ -273,27 +344,33 @@ pub struct Scanner {
                 self.add_token(TokenType::WHILE);
             },
             _ => {
-                eprintln!("ERROR");
+                self.add_token_literal(TokenType::IDENTIFIER, Some(Literal::String(lt)));
             }
         }
     }
 
 
     fn scan_token(&mut self) {
-        let curr = self.get_next_char();
+        let curr = self.advance();
 
         match curr {
             '{' => {
-                self.add_token(TokenType::LeftParen);
+                self.add_token(TokenType::LeftBrace);
             },
             '}' => {
+                self.add_token(TokenType::RightBrace);
+            },
+            '(' => {
+                self.add_token(TokenType::LeftParen);
+            },
+            ')' => {
                 self.add_token(TokenType::RightParen);
             },
             '[' => {
-                self.add_token(TokenType::LeftBrace);
+                self.add_token(TokenType::LeftSqrBrace);
             },
             ']' => {
-                self.add_token(TokenType::RightBrace);
+                self.add_token(TokenType::RightSqrBrace);
             },
             ',' => {
                 self.add_token(TokenType::COMMA);
@@ -316,7 +393,8 @@ pub struct Scanner {
             
 
             '!' => {
-                let next = self.get_next_char();
+                let next = self.peek_next(); 
+                
                 if next  == '=' {
                     self.add_token(TokenType::BangEqual);    
                 } else {
@@ -324,7 +402,8 @@ pub struct Scanner {
                 }
             },
             '=' => {
-                let next = self.get_next_char();
+                let next = self.peek_next();
+                
                 if next  == '=' {
                     self.add_token(TokenType::EqualEqual);    
                 } else {
@@ -332,7 +411,8 @@ pub struct Scanner {
                 }
             },
             '>' => {
-                let next = self.get_next_char();
+                let next = self.peek_next();
+                
                 if next  == '=' {
                     self.add_token(TokenType::GreaterEqual);    
                 } else {
@@ -340,7 +420,8 @@ pub struct Scanner {
                 }
             },
             '<' => {
-                let next = self.get_next_char();
+                let next = self.peek_next();
+                
                 if next  == '=' {
                     self.add_token(TokenType::LessEqual);    
                 } else {
@@ -351,12 +432,12 @@ pub struct Scanner {
                 self.get_token_string();
             },
             '/' => {
-                let next = self.get_next_char();
+                let next = self.peek_next();
+                
                 if next  == '/' {
-                    // A comment goes until the end of the line.
                     self.get_next_char();    
-                    while self.source[self.current] != '\n' && !self.at_end() {
-                        self.current += 1;
+                    while self.peek() != '\n' && !self.at_end() {
+                        let _ = self.get_next_char();
                     }
                 } else {
                     self.add_token(TokenType::SLASH);
@@ -365,8 +446,12 @@ pub struct Scanner {
             ' ' | '\r' | '\t' => {
 
             }
-            '\n' => {
-                self.line += 1;
+            '\\' => {
+                let next = self.peek_next();
+                
+                if next  == 'n' {
+                    self.line += 1;
+                }
             },
             'a'..='z' | 'A'..='Z' => {
                 self.scan_token_literal_and_keywords();
@@ -374,8 +459,11 @@ pub struct Scanner {
             '0'..='9' => {
                 self.get_token_number();
             },
+            '\0' => {
+                self.add_token(TokenType::EOF);
+            },
             _ => {
-                self.add_token(TokenType::IDENTIFIER);
+                eprintln!("scan_token : ERROR");
             }
         }
     }
